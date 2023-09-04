@@ -18,7 +18,7 @@
 import numpy as np
 import aesara
 import aesara.tensor  as T
-from gempy.core.grid_modules.grid_types import CenteredGrid
+from gempy.core.data.grid_types import CenteredGrid
 
 
 class GravityPreprocessing(CenteredGrid):
