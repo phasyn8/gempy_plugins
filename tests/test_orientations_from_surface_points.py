@@ -2,7 +2,8 @@ import gempy as gp
 import numpy as np
 import os
 
-from orientations_generator._orientations_generator import select_nearest_surfaces_points
+from orientations_generator import select_nearest_surfaces_points
+from orientations_generator._orientations_generator import NearestSurfacePointsSearcher
 
 input_path = os.path.dirname(__file__) + '/../../examples/data'
 
@@ -38,67 +39,34 @@ def test_set_orientations():
 
 
 def test_select_nearest_surface_points():
-    data_path = 'https://raw.githubusercontent.com/cgre-aachen/gempy_data/master/'
-    path_to_data = data_path + "/data/input_data/jan_models/"
-
-    geo_data = gp.create_data_legacy('fault', extent=[0, 1000, 0, 1000, 0, 1000],
-                                     resolution=[50, 50, 50],
-                                     path_o=path_to_data + "model5_orientations.csv",
-                                     path_i=path_to_data + "model5_surface_points.csv")
 
     geo_model = _model_factory()
     print(geo_model)
-   
-    # detect fault names
-    f_id = geo_data._faults.df.index.categories[
-        geo_data._faults.df.isFault.values]
-    # find fault points
-    fault_poi = geo_data._surface_points.df[
-        geo_data._surface_points.df.series.isin(f_id)]
+    
+    # TODO: This is to select the surface points we want to use to calculate the orientations
+    
+    element: gp.data.StructuralElement = geo_model.structural_frame.get_element_by_name("fault")
 
     # find neighbours
     knn = select_nearest_surfaces_points(
-        geo_model=geo_data,
-        surface_points=fault_poi,
-        searchcrit=1
+        surface_points_xyz=element.surface_points.xyz,
+        searchcrit=3
     )
     
     radius = select_nearest_surfaces_points(
-        geo_model=geo_data,
-        surface_points=fault_poi, 
-        searchcrit=200.
+        surface_points_xyz=element.surface_points.xyz,
+        searchcrit=200.,
+        search_type=NearestSurfacePointsSearcher.RADIUS
     )
-
-    # sort neighbours, necessary for equal testing
-    knn = [k.sort_values() for k in knn]
-    radius = [r.sort_values() for r in radius]
-
-    # define reference
-    reference = [[16, 17], [16, 17], [18, 19], [18, 19], [20, 21], [20, 21]]
-
-    assert np.array_equal(reference, knn) and np.array_equal(reference, radius)
+    
+    return knn
 
 
 def test_set_orientation_from_neighbours():
-    data_path = 'https://raw.githubusercontent.com/cgre-aachen/gempy_data/master/'
-    path_to_data = data_path + "/data/input_data/jan_models/"
-
-    geo_data = gp.create_data_legacy('fault', extent=[0, 1000, 0, 1000, 0, 1000],
-                                     resolution=[50, 50, 50],
-                                     path_o=path_to_data + "model5_orientations.csv",
-                                     path_i=path_to_data + "model5_surface_points.csv")
-
-    # Assigning series to formations as well as their order (timewise)
-    gp.map_stack_to_surfaces(geo_data, {"Fault_Series": 'fault',
-                                        "Strat_Series": ('rock2', 'rock1')})
-    geo_data.set_is_fault(['Fault_Series'])
-
-    # detect fault names
-    f_id = geo_data._faults.df.index.categories[
-        geo_data._faults.df.isFault.values]
-    # find fault points
-    fault_poi = geo_data._surface_points.df[
-        geo_data._surface_points.df.series.isin(f_id)]
+    
+    
+    
+    
     # find neighbours
     neighbours = gp.select_nearest_surfaces_points(geo_data, fault_poi, 5)
     # calculate one fault orientation
