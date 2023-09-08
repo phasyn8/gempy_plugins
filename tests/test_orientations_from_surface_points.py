@@ -2,12 +2,14 @@ import gempy as gp
 import numpy as np
 import os
 
+from orientations_generator._orientations_generator import select_nearest_surfaces_points
+
 input_path = os.path.dirname(__file__) + '/../../examples/data'
 
-data_path = os.path.abspath('../data')
+data_path = os.path.abspath('data')
 
 
-def test_set_orientations():
+def _model_factory():
     # Importing the data from CSV-files and setting extent and resolution
     geo_data = gp.create_geomodel(
         extent=[0, 2000, 0, 2000, 0, 2000],
@@ -17,6 +19,11 @@ def test_set_orientations():
             path_to_surface_points=f"{data_path}/model5_surface_points.csv",
         )
     )
+    return geo_data
+
+
+def test_set_orientations():
+    geo_data = _model_factory()
 
     orientations: gp.data.OrientationsTable = gp.create_orientations_from_surface_points(geo_data.surface_points)
 
@@ -39,11 +46,9 @@ def test_select_nearest_surface_points():
                                      path_o=path_to_data + "model5_orientations.csv",
                                      path_i=path_to_data + "model5_surface_points.csv")
 
-    # Assigning series to formations as well as their order (timewise)
-    gp.map_stack_to_surfaces(geo_data, {"Fault_Series": 'fault',
-                                        "Strat_Series": ('rock2', 'rock1')})
-    geo_data.set_is_fault(['Fault_Series'])
-
+    geo_model = _model_factory()
+    print(geo_model)
+   
     # detect fault names
     f_id = geo_data._faults.df.index.categories[
         geo_data._faults.df.isFault.values]
@@ -52,8 +57,17 @@ def test_select_nearest_surface_points():
         geo_data._surface_points.df.series.isin(f_id)]
 
     # find neighbours
-    knn = gp.select_nearest_surfaces_points(geo_data, fault_poi, 1)
-    radius = gp.select_nearest_surfaces_points(geo_data, fault_poi, 200.)
+    knn = select_nearest_surfaces_points(
+        geo_model=geo_data,
+        surface_points=fault_poi,
+        searchcrit=1
+    )
+    
+    radius = select_nearest_surfaces_points(
+        geo_model=geo_data,
+        surface_points=fault_poi, 
+        searchcrit=200.
+    )
 
     # sort neighbours, necessary for equal testing
     knn = [k.sort_values() for k in knn]
