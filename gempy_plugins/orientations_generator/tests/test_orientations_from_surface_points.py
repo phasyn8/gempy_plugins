@@ -4,7 +4,7 @@ import os
 from orientations_generator import select_nearest_surfaces_points, NearestSurfacePointsSearcher
 
 input_path = os.path.dirname(__file__) + '/../../examples/data'
-data_path = os.path.abspath('data')
+data_path = os.path.abspath('../../../tests/data')
 
 
 def _model_factory():
@@ -24,7 +24,7 @@ def test_set_orientations():
     geo_data = _model_factory()
 
     orientations: gp.data.OrientationsTable = gp.create_orientations_from_surface_points_coords(
-        xyz_coords=geo_data.surface_points
+        xyz_coords=geo_data.surface_points.xyz
     )
 
     gp.add_orientations(
