@@ -7,6 +7,12 @@ Created on 07.08.2019
 """
 
 import warnings
+from typing import Optional, Sequence
+
+import gempy as gp
+
+from gempy_engine.core.data.raw_arrays_solution import RawArraysSolution
+
 try:
     from scipy.spatial.distance import cdist
 except ImportError:
@@ -14,25 +20,26 @@ except ImportError:
 
 import numpy as np
 import pandas as pd
-from gempy_viewer import _plot
-from gempy_viewer import helpers, _visualization_2d
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from copy import deepcopy
 
-class domain(object):
 
-    def __init__(self, model, domain=None, data=None, set_mean=None):
+class Domain:
+    def __init__(self, model_solutions: gp.data.Solutions, domain: Optional[Sequence] = None, data=None, set_mean=None):
 
         # set model from a gempy solution
         # TODO: Check if I actually need all this or if its easier to just get grid and lith of the solution
-        self.sol = model
+        self.sol: RawArraysSolution = model_solutions.raw_arrays
 
         # set kriging surfaces, basically in which lithologies to do all this, default is everything
         # TODO: Maybe also allow to pass a gempy regular grid object
         if domain is None:
             domain = np.unique(self.sol.lith_block)
-        self.set_domain(domain)
+        self.set_domain(
+            domain=domain,
+            grid_values=model_solutions.octrees_output[-1].grid_centers.regular_grid.original_values
+        )
 
         # set data, default is None
         # TODO: need to figure out a way to then set mean and variance for the SGS and SK
@@ -49,7 +56,7 @@ class domain(object):
         self.inp_var = np.var(data[:, 3])
         self.inp_std = np.sqrt(self.inp_var)
 
-    def set_domain(self, domain):
+    def set_domain(self, domain: np.ndarray, grid_values: np.ndarray):
         """
         Method to cut domain by array of surfaces. Simply masking the lith_block with array of input lithologies
         applying mask to grid.
@@ -63,11 +70,12 @@ class domain(object):
         self.domain = domain
 
         # mask by array of input surfaces (by id, can be from different series)
+
         self.mask = np.isin(self.sol.lith_block, self.domain)
 
         # Apply mask to lith_block and grid
         self.krig_lith = self.sol.lith_block[self.mask]
-        self.krig_grid = self.sol.grid.values[self.mask]
+        self.krig_grid = grid_values[self.mask]
 
     def set_data(self, data):
         """
@@ -86,7 +94,7 @@ class domain(object):
         self.data_df = pd.DataFrame(data=d)
 
 
-class variogram_model(object):
+class VariogramModel(object):
 
     # class containing all the variogram functionality
 
@@ -182,26 +190,26 @@ class variogram_model(object):
 
         if show_parameters == True:
             plt.axhline(self.sill, color='black', lw=1)
-            plt.text(self.range_*2, self.sill, 'sill', fontsize=12, va='center', ha='center', backgroundcolor='w')
+            plt.text(self.range_ * 2, self.sill, 'sill', fontsize=12, va='center', ha='center', backgroundcolor='w')
             plt.axvline(self.range_, color='black', lw=1)
-            plt.text(self.range_, self.sill/2, 'range', fontsize=12, va='center', ha='center', backgroundcolor='w')
+            plt.text(self.range_, self.sill / 2, 'range', fontsize=12, va='center', ha='center', backgroundcolor='w')
 
         if type_ == 'variogram':
-            d = np.arange(0, self.range_*4, self.range_/1000)
+            d = np.arange(0, self.range_ * 4, self.range_ / 1000)
             plt.plot(d, self.calculate_semivariance(d), label=self.theoretical_model + " variogram model")
             plt.ylabel('semivariance')
             plt.title('Variogram model')
             plt.legend()
 
         if type_ == 'covariance':
-            d = np.arange(0, self.range_*4, self.range_/1000)
+            d = np.arange(0, self.range_ * 4, self.range_ / 1000)
             plt.plot(d, self.calculate_covariance(d), label=self.theoretical_model + " covariance model")
             plt.ylabel('covariance')
             plt.title('Covariance model')
             plt.legend()
 
         if type_ == 'both':
-            d = np.arange(0, self.range_*4, self.range_/1000)
+            d = np.arange(0, self.range_ * 4, self.range_ / 1000)
             plt.plot(d, self.calculate_semivariance(d), label=self.theoretical_model + " variogram model")
             plt.plot(d, self.calculate_covariance(d), label=self.theoretical_model + " covariance model")
             plt.ylabel('semivariance/covariance')
@@ -209,9 +217,8 @@ class variogram_model(object):
             plt.legend()
 
         plt.xlabel('lag distance')
-        plt.ylim(0-self.sill/20, self.sill+self.sill/20)
-        plt.xlim(0, self.range_*4)
-
+        plt.ylim(0 - self.sill / 20, self.sill + self.sill / 20)
+        plt.xlim(0, self.range_ * 4)
 
 
 class field_solution(object):
@@ -240,7 +247,7 @@ class field_solution(object):
         Returns:
 
         """
-        a = np.full_like(self.domain.mask, np.nan, dtype=np.double) #array like lith_block but with nan if outside domain
+        a = np.full_like(self.domain.mask, np.nan, dtype=np.double)  # array like lith_block but with nan if outside domain
 
         est_vals = self.results_df['estimated value'].values
         est_var = self.results_df['estimation variance'].values
@@ -257,13 +264,13 @@ class field_solution(object):
         else:
             print('prop must be val var or both')
 
-        #create plot object
+        # create plot object
         p = _visualization_2d.PlotSolution(geo_data)
         _a, _b, _c, extent_val, x, y = p._slice(direction, cell_number)[:-2]
 
-        #colors
+        # colors
         cmap = cm.get_cmap(cmap)
-        cmap.set_bad(color='w', alpha=alpha) #define color and alpha for nan values
+        cmap.set_bad(color='w', alpha=alpha)  # define color and alpha for nan values
 
         # plot
         if prop is not 'both':
@@ -299,6 +306,7 @@ class field_solution(object):
             helpers.add_colorbar(im2, label='variance[]')
             plt.tight_layout()
 
+
 # TODO: check with new ordianry kriging and nugget effect
 def simple_kriging(a, b, prop, var_mod, inp_mean):
     '''
@@ -320,11 +328,11 @@ def simple_kriging(a, b, prop, var_mod, inp_mean):
     w = np.zeros((shape))
 
     # Filling matrices with covariances based on calculated distances
-    C[:shape, :shape] = var_mod.calculate_covariance(b) #? cov or semiv
-    c[:shape] = var_mod.calculate_covariance(a) #? cov or semiv
+    C[:shape, :shape] = var_mod.calculate_covariance(b)  # ? cov or semiv
+    c[:shape] = var_mod.calculate_covariance(a)  # ? cov or semiv
 
     # nugget effect for simple kriging - dont remember why i set this actively, should be the same
-    #np.fill_diagonal(C, self.sill)
+    # np.fill_diagonal(C, self.sill)
 
     # TODO: find way to check quality of matrix and solutions for instability
     # Solve Kriging equations
@@ -336,6 +344,7 @@ def simple_kriging(a, b, prop, var_mod, inp_mean):
     result = inp_mean + np.sum(w * (prop - inp_mean))
 
     return result, pred_var
+
 
 def ordinary_kriging(a, b, prop, var_mod):
     '''
@@ -380,6 +389,7 @@ def ordinary_kriging(a, b, prop, var_mod):
     result = np.sum(w[:shape] * prop)
 
     return result, pred_var
+
 
 def create_kriged_field(domain, variogram_model, distance_type='euclidian',
                         moving_neighbourhood='all', kriging_type='OK', n_closest_points=20):
@@ -449,14 +459,15 @@ def create_kriged_field(domain, variogram_model, distance_type='euclidian',
 
     # create dataframe of results data for calling
     d = {'X': domain.krig_grid[:, 0], 'Y': domain.krig_grid[:, 1], 'Z': domain.krig_grid[:, 2],
-        'estimated value': kriging_result_vals, 'estimation variance': kriging_result_vars}
+         'estimated value': kriging_result_vals, 'estimation variance': kriging_result_vars}
 
     results_df = pd.DataFrame(data=d)
 
     return field_solution(domain, variogram_model, results_df, field_type='interpolation')
 
+
 def create_gaussian_field(domain, variogram_model, distance_type='euclidian',
-                        moving_neighbourhood='all', kriging_type='OK', n_closest_points=20):
+                          moving_neighbourhood='all', kriging_type='OK', n_closest_points=20):
     '''
     Method to create a kriged field over the defined grid of the gempy solution depending on the defined
     input data (conditioning).
@@ -472,9 +483,9 @@ def create_gaussian_field(domain, variogram_model, distance_type='euclidian',
     np.random.shuffle(shuffled_grid)
 
     # append shuffled grid to input locations
-    sgs_locations = np.vstack((domain.data[:,:3],shuffled_grid))
+    sgs_locations = np.vstack((domain.data[:, :3], shuffled_grid))
     # create array for input properties
-    sgs_prop_updating = domain.data[:,3] # use this and then always stack new ant end
+    sgs_prop_updating = domain.data[:, 3]  # use this and then always stack new ant end
 
     # container for estimation variances
     estimation_var = np.zeros(len(shuffled_grid))
@@ -493,9 +504,9 @@ def create_gaussian_field(domain, variogram_model, distance_type='euclidian',
     for i in range(len(domain.krig_grid)):
         # STEP 1: cut update distance matrix to correct size
         # HAVE TO CHECK IF THIS IS REALLY CORRECT
-        active_distance_matrix = dist_all_to_all[:active_data,:active_data]
-        active_distance_vector = dist_all_to_all[:,active_data] #basically next point to be simulated
-        active_distance_vector = active_distance_vector[:active_data] #cut to left or diagonal
+        active_distance_matrix = dist_all_to_all[:active_data, :active_data]
+        active_distance_vector = dist_all_to_all[:, active_data]  # basically next point to be simulated
+        active_distance_vector = active_distance_vector[:active_data]  # cut to left or diagonal
 
         # TODO: NEED PART FOR ZERO INPUT OR NO POINTS IN RANGE OR LESS THAN N POINTS
 
@@ -512,7 +523,7 @@ def create_gaussian_field(domain, variogram_model, distance_type='euclidian',
             # This seems to work
             if len(sgs_prop_updating) <= n_closest_points:
                 a = active_distance_vector[:active_data]
-                b = active_distance_matrix[:active_data,:active_data]
+                b = active_distance_matrix[:active_data, :active_data]
                 prop = sgs_prop_updating
 
             # this does not # DAMN THIS STILL HAS ITSELF RIGHT? PROBLEM!
@@ -552,22 +563,19 @@ def create_gaussian_field(domain, variogram_model, distance_type='euclidian',
 
         # append to prop:
         sgs_prop_updating = np.append(sgs_prop_updating, estimate)
-        estimation_var[i]= var
+        estimation_var[i] = var
 
         # at end of loop: include simulated point for next step
         active_data += 1
 
     # delete original input data from results
-    simulated_prop = sgs_prop_updating[len(domain.data[:,3]):] # check if this works like intended
+    simulated_prop = sgs_prop_updating[len(domain.data[:, 3]):]  # check if this works like intended
 
     # create dataframe of results data for calling
     d = {'X': shuffled_grid[:, 0], 'Y': shuffled_grid[:, 1], 'Z': shuffled_grid[:, 2],
          'estimated value': simulated_prop, 'estimation variance': estimation_var}
 
     results_df = pd.DataFrame(data=d)
-    results_df = results_df.sort_values(['X','Y','Z'])
+    results_df = results_df.sort_values(['X', 'Y', 'Z'])
 
     return field_solution(domain, variogram_model, results_df, field_type='simulation')
-
-
-
