@@ -26,7 +26,7 @@ from copy import deepcopy
 
 
 class Domain:
-    def __init__(self, model_solutions: gp.data.Solutions, domain: Optional[Sequence] = None, data=None, set_mean=None):
+    def __init__(self, model_solutions: gp.data.Solutions, transform: gp.data.Transform, domain: Optional[Sequence] = None, data=None, set_mean=None):
 
         # set model from a gempy solution
         # TODO: Check if I actually need all this or if its easier to just get grid and lith of the solution
@@ -38,7 +38,7 @@ class Domain:
             domain = np.unique(self.sol.lith_block)
         self.set_domain(
             domain=domain,
-            grid_values=model_solutions.octrees_output[-1].grid_centers.regular_grid.original_values
+            grid_values=transform.apply_inverse(model_solutions.octrees_output[-1].grid_centers.regular_grid.original_values)
         )
 
         # set data, default is None
