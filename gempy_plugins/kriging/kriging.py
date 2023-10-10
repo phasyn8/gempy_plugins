@@ -13,6 +13,9 @@ import gempy as gp
 
 from gempy_engine.core.data.raw_arrays_solution import RawArraysSolution
 
+from gempy_viewer.modules.plot_2d.visualization_2d import Plot2D
+from gempy_viewer.modules.plot_2d.drawer_regular_grid_2d import plot_regular_grid_area
+
 try:
     from scipy.spatial.distance import cdist
 except ImportError:
@@ -221,7 +224,7 @@ class VariogramModel(object):
         plt.xlim(0, self.range_ * 4)
 
 
-class field_solution(object):
+class KrigingFieldSolution(object):
 
     def __init__(self, domain, variogram_model, results, field_type):
 
@@ -305,6 +308,27 @@ class field_solution(object):
                                extent=self.domain.sol.grid.regular_grid.extent[[0, 1, 4, 5]])
             helpers.add_colorbar(im2, label='variance[]')
             plt.tight_layout()
+
+
+def plot_kriging_results(geo_data: gp.data.GeoModel, kriging_solution: KrigingFieldSolution, plot_2d: Plot2D,
+                         title: str, result_column: list[str]):
+    for e, ax in enumerate(plot_2d.axes):
+        a = np.full_like(kriging_solution.domain.mask, np.nan, dtype=np.double)
+        vals = kriging_solution.results_df[result_column[e]].values
+        a[np.where(kriging_solution.domain.mask == True)] = vals
+
+        im = plot_regular_grid_area(
+            ax=ax,
+            slicer_data=plot_2d.section_data_list[0].slicer_data,
+            block=a,
+            resolution=geo_data.grid.regular_grid.resolution,
+            cmap='viridis',
+            norm=None,
+        )
+
+        ax.set_title(title)
+        plot_2d.fig.colorbar(im, label='Property value')
+    plot_2d.fig.show()
 
 
 # TODO: check with new ordianry kriging and nugget effect
@@ -463,7 +487,7 @@ def create_kriged_field(domain, variogram_model, distance_type='euclidian',
 
     results_df = pd.DataFrame(data=d)
 
-    return field_solution(domain, variogram_model, results_df, field_type='interpolation')
+    return KrigingFieldSolution(domain, variogram_model, results_df, field_type='interpolation')
 
 
 def create_gaussian_field(domain, variogram_model, distance_type='euclidian',
@@ -578,4 +602,4 @@ def create_gaussian_field(domain, variogram_model, distance_type='euclidian',
     results_df = pd.DataFrame(data=d)
     results_df = results_df.sort_values(['X', 'Y', 'Z'])
 
-    return field_solution(domain, variogram_model, results_df, field_type='simulation')
+    return KrigingFieldSolution(domain, variogram_model, results_df, field_type='simulation')
