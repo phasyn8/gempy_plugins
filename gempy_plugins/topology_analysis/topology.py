@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 
 
 def _get_nunconf(geo_model) -> int:
-    return np.count_nonzero( geo_model._stack.df.BottomRelation == "Erosion" ) - 2  # TODO -2 n other lith series
+    return np.count_nonzero(geo_model._stack.df.BottomRelation == "Erosion") - 2  # TODO -2 n other lith series
 
 
 def _get_nfaults(geo_model) -> int:
@@ -32,9 +32,6 @@ def _get_nfaults(geo_model) -> int:
 
 
 def _get_fault_blocks(geo_model: gp.data.GeoModel) -> np.ndarray:
-    # n_unconf = _get_nunconf(geo_model)
-    # n_faults = _get_nfaults(geo_model)
-
     fault_blocks = geo_model.solutions.raw_arrays.block_matrix[geo_model.structural_frame.group_is_fault]
     resolution = geo_model.solutions.octrees_output[-1].grid_centers.regular_grid.resolution
 
@@ -43,7 +40,6 @@ def _get_fault_blocks(geo_model: gp.data.GeoModel) -> np.ndarray:
 
 
 def _get_lith_blocks(geo_model: gp.data.GeoModel) -> np.ndarray:
-
     lith_blocks = geo_model.solutions.raw_arrays.block_matrix[[not x for x in geo_model.structural_frame.group_is_fault]]
     resolution = geo_model.solutions.octrees_output[-1].grid_centers.regular_grid.resolution
 
@@ -158,10 +154,8 @@ def _analyze_topology(
     fault_shift = fault_matrix_sum.min()
     fault_matrix_sum_shift = fault_matrix_sum - fault_shift
 
-    where = np.tile(lith_matrix, (n_lith, 1)) == np.unique(lith_matrix).reshape(
-        -1, 1)
-    lith_matrix_shift = np.sum(where * np.arange(n_lith).reshape(-1, 1),
-                               axis=0) + 1
+    where = np.tile(lith_matrix, (n_lith, 1)) == np.unique(lith_matrix).reshape(-1, 1)
+    lith_matrix_shift = np.sum(where * np.arange(n_lith).reshape(-1, 1), axis=0) + 1
 
     topo_matrix = lith_matrix_shift + n_lith * fault_matrix_sum_shift
     topo_matrix_3D = topo_matrix.reshape(*res)
@@ -193,19 +187,14 @@ def _analyze_topology(
     else:
         z_edges = np.array([[], []])
 
-    edges = np.unique(
-        np.concatenate((x_edges.T, y_edges.T, z_edges.T), axis=0), axis=0
-    )
+    edges = np.unique(np.concatenate((x_edges.T, y_edges.T, z_edges.T), axis=0), axis=0)
 
     centroids = _get_centroids(topo_matrix_3D)
 
     return edges, centroids
 
 
-def get_lot_node_to_lith_id(
-        geo_model,
-        centroids: Dict[int, np.ndarray]
-) -> Dict[int, int]:
+def get_lot_node_to_lith_id(geo_model, centroids: Dict[int, np.ndarray]) -> Dict[int, int]:
     """Get look-up table to translate topology node id's back into GemPy lith
     id's.
     
@@ -216,9 +205,8 @@ def get_lot_node_to_lith_id(
     Returns:
         Dict[int, int]: Look-up table translating node id -> lith id.
     """
-    lb = geo_model.solutions.lith_block.reshape(
-        geo_model._grid.regular_grid.resolution
-    ).astype(int)
+    resolution = geo_model.solutions.octrees_output[-1].grid_centers.regular_grid.resolution
+    lb = geo_model.solutions.raw_arrays.lith_block.reshape(resolution).astype(int)
 
     lot = {}
     for node, pos in centroids.items():
@@ -228,9 +216,7 @@ def get_lot_node_to_lith_id(
     return lot
 
 
-def get_lot_lith_to_node_id(
-        lot: Dict[int, np.ndarray]
-) -> Dict[int, List[int]]:
+def get_lot_lith_to_node_id(lot: Dict[int, np.ndarray]) -> Dict[int, List[int]]:
     """Get look-up table to translate lith id's back into topology node
     id's.
     
@@ -250,10 +236,7 @@ def get_lot_lith_to_node_id(
     return lot2
 
 
-def get_lot_node_to_fault_block(
-        geo_model,
-        centroids: Dict[int, np.ndarray]
-) -> Dict[int, int]:
+def get_lot_node_to_fault_block( geo_model, centroids: Dict[int, np.ndarray] ) -> Dict[int, int]:
     """Get a look-up table to access fault block id's for each topology node
     id.
     
@@ -280,16 +263,14 @@ def get_fault_ids(geo_model) -> List[int]:
     Returns:
         List[int]: List of fault id's.
     """
-    f_series_names = geo_model._faults.df[geo_model._faults.df.isFault].index
-    fault_ids = [0]
-    for fsn in f_series_names:
-        fid = geo_model._surfaces.df[
-                geo_model._surfaces.df.series == fsn].id.values[0]
-        fault_ids.append(fid)
+    group_is_fault: list[bool] = geo_model.structural_frame.group_is_fault
+    n_faults = np.sum(group_is_fault)
+    fault_ids = [i for i in range(n_faults + 1)]
+
     return fault_ids
 
 
-def get_lith_ids(geo_model, basement: bool = True) -> List[int]:
+def get_lith_ids(geo_model: gp.data.GeoModel) -> List[int]:
     """ Get lithology id's of all lithologies (except basement) in given
      geomodel.
     
@@ -299,16 +280,13 @@ def get_lith_ids(geo_model, basement: bool = True) -> List[int]:
     Returns:
         List[int]: List of lithology id's.
     """
-    fmt_series_names = geo_model._faults.df[~geo_model._faults.df.isFault].index
-    lith_ids = []
-    for fsn in fmt_series_names:
-        if not basement:
-            if fsn == "Basement":
-                continue
-        lids = geo_model._surfaces.df[
-            geo_model._surfaces.df.series == fsn].id.values
-        for lid in lids:
-            lith_ids.append(lid)
+    # ! This is only working assuming that the faults are on top
+    group_is_fault: list[bool] = geo_model.structural_frame.group_is_fault
+    n_elements = geo_model.structural_frame.n_elements
+    n_faults = np.sum(group_is_fault)
+
+    lith_ids = [i for i in range(n_faults + 1, n_elements + 1)]
+
     return lith_ids
 
 
@@ -349,10 +327,7 @@ def get_detailed_labels(
     return edges_, centroids_
 
 
-def _get_edges(
-        l: np.ndarray,
-        r: np.ndarray
-) -> Optional[np.ndarray]:
+def _get_edges( l: np.ndarray, r: np.ndarray ) -> Optional[np.ndarray]:
     """Get edges from given shifted arrays.
 
     Args:
@@ -515,8 +490,7 @@ def plot_adjacency_matrix(
     n_faults = len(f_ids) // 2
     lith_ids = get_lith_ids(geo_model)
     n_liths = len(lith_ids)
-    adj_matrix_labels, adj_matrix_lith_labels, adj_matrix_fault_labels = _get_adj_matrix_labels(
-        geo_model)
+    adj_matrix_labels, adj_matrix_lith_labels, adj_matrix_fault_labels = _get_adj_matrix_labels(geo_model)
     # ///////////////////////////////////////////////////////
     n = len(adj_matrix_labels)
     fig, ax = plt.subplots(figsize=(n // 2.5, n // 2.5))
@@ -536,13 +510,10 @@ def plot_adjacency_matrix(
 
     # ///////////////////////////////////////////////////////
     # lith tick labels colors
-    colors = list(geo_model._surfaces.colors.colordict.values())
-    bboxkwargs = dict(
-        edgecolor='none',
-    )
-    for xticklabel, yticklabel, l in zip(ax.xaxis.get_ticklabels(),
-                                         ax.yaxis.get_ticklabels(),
-                                         adj_matrix_labels[::1]):
+    colors = geo_model.structural_frame.elements_colors
+    # colors = list(geo_model._surfaces.colors.colordict.values())
+    bboxkwargs = dict(edgecolor='none', )
+    for xticklabel, yticklabel, l in zip(ax.xaxis.get_ticklabels(), ax.yaxis.get_ticklabels(), adj_matrix_labels[::1]):
         color = colors[l[0] - 1]
 
         xticklabel.set_bbox(
@@ -569,8 +540,7 @@ def plot_adjacency_matrix(
     newax.spines['left'].set_position(('outward', 25))
     newax.set_ylim(0, n_faults * 2)
     newax.set_yticks(np.arange(1, n_faults * 2 + 1) - 0.5)
-    newax.set_yticklabels(
-        ["FB " + str(i + 1) for i in range(n_faults * 2)][::1])
+    newax.set_yticklabels( ["FB " + str(i + 1) for i in range(n_faults * 2)][::1])
 
     # ///////////////////////////////////////////////////////
     # (dotted) lines for fb's
@@ -601,11 +571,7 @@ def plot_adjacency_matrix(
     return
 
 
-def check_adjacency(
-        edges: set,
-        n1: Union[int, str],
-        n2: Union[int, str]
-) -> bool:
+def check_adjacency( edges: set, n1: Union[int, str], n2: Union[int, str] ) -> bool:
     """Check if given nodes n1 and n2 are adjacent in given topology
     edge set.
     
@@ -623,10 +589,7 @@ def check_adjacency(
         return False
 
 
-def get_adjacencies(
-        edges: set,
-        node: Union[int, str]
-) -> set:
+def get_adjacencies( edges: set, node: Union[int, str] ) -> set:
     """Get node labels of all adjacent geobodies of geobody with given node
      in given set of edges.
     
