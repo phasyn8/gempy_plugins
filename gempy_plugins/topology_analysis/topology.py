@@ -15,35 +15,40 @@
     along with gempy.  If not, see <http://www.gnu.org/licenses/>.
 
 
-@author: Alexander Schaaf
+@author: Alexander Schaaf and Miguel de la Varga
 """
+import gempy as gp
 import numpy as np
 from typing import List, Set, Tuple, Dict, Union, Optional
 import matplotlib.pyplot as plt
 
 
 def _get_nunconf(geo_model) -> int:
-    return np.count_nonzero(
-        geo_model._stack.df.BottomRelation == "Erosion"
-    ) - 2  # TODO -2 n other lith series
+    return np.count_nonzero( geo_model._stack.df.BottomRelation == "Erosion" ) - 2  # TODO -2 n other lith series
 
 
 def _get_nfaults(geo_model) -> int:
     return np.count_nonzero(geo_model._faults.df.isFault)
 
 
-def _get_fb(geo_model) -> np.ndarray:
-    n_unconf = _get_nunconf(geo_model)
-    n_faults = _get_nfaults(geo_model)
-    return np.round(
-        geo_model.solutions.block_matrix[n_unconf:n_faults + n_unconf, 0, :]
-    ).astype(int).sum(axis=0).reshape(*geo_model._grid.regular_grid.resolution)
+def _get_fault_blocks(geo_model: gp.data.GeoModel) -> np.ndarray:
+    # n_unconf = _get_nunconf(geo_model)
+    # n_faults = _get_nfaults(geo_model)
+
+    fault_blocks = geo_model.solutions.raw_arrays.block_matrix[geo_model.structural_frame.group_is_fault]
+    resolution = geo_model.solutions.octrees_output[-1].grid_centers.regular_grid.resolution
+
+    int__sum_axis__reshape = np.round(fault_blocks).astype(int).sum(axis=0).reshape(*resolution)
+    return int__sum_axis__reshape
 
 
-def _get_lb(geo_model) -> np.ndarray:
-    return np.round(
-        geo_model.solutions.lith_block
-    ).astype(int).reshape(*geo_model._grid.regular_grid.resolution)
+def _get_lith_blocks(geo_model: gp.data.GeoModel) -> np.ndarray:
+
+    lith_blocks = geo_model.solutions.raw_arrays.block_matrix[[not x for x in geo_model.structural_frame.group_is_fault]]
+    resolution = geo_model.solutions.octrees_output[-1].grid_centers.regular_grid.resolution
+
+    int__sum_axis__reshape = np.round(lith_blocks).astype(int).sum(axis=0).reshape(*resolution)
+    return int__sum_axis__reshape
 
 
 def compute_topology(
@@ -65,9 +70,9 @@ def compute_topology(
     Returns:
         edges, centroids [numpy array]: edges and centroids of the topology graph
     """
-    res = geo_model._grid.regular_grid.resolution
-    fb = _get_fb(geo_model)
-    lb = _get_lb(geo_model)
+    res = geo_model.grid.regular_grid.resolution
+    fb = _get_fault_blocks(geo_model)
+    lb = _get_lith_blocks(geo_model)
     n_lith = len(np.unique(lb))  # ? quicker looking it up in geomodel?
 
     if cell_number is None or direction is None:
@@ -431,8 +436,7 @@ def _get_centroids(labels: np.ndarray) -> dict:
         labels (Array[int, ..., ..., ...]): Uniquely labeled block.
     
     Returns:
-        dict: Geobody node keys yield centroid coordinate tuples in array
-            coordinates.
+        dict: Geobody node keys yield centroid coordinate tuples in array coordinates.
     """
     node_locs = []
     ulabels = np.unique(labels)
