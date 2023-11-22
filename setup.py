@@ -2,11 +2,9 @@
 
 from setuptools import setup, find_packages
 
-with open("gempy_plugins/__init__.py", "r") as f:
-    for line in f:
-        if line.startswith("__version__"):
-            version = line.split("=")[1].strip().strip("'")
-            break
+import gempy
+
+version = gempy.__version__
 
 
 def read_requirements(file_name):
