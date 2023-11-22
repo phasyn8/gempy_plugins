@@ -1,1 +1,2 @@
-__version__ = '2023.2.0b1'
+import gempy
+__version__ = gempy.__version__
