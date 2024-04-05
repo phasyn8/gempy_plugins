@@ -33,7 +33,7 @@ def _get_nfaults(geo_model) -> int:
 
 def _get_fault_blocks(geo_model: gp.data.GeoModel) -> np.ndarray:
     fault_blocks = geo_model.solutions.raw_arrays.block_matrix[geo_model.structural_frame.group_is_fault]
-    resolution = geo_model.solutions.octrees_output[-1].grid_centers.regular_grid.resolution
+    resolution = geo_model.solutions.octrees_output[-1].grid_centers.octree_grid.resolution
 
     int__sum_axis__reshape = np.round(fault_blocks).astype(int).sum(axis=0).reshape(*resolution)
     return int__sum_axis__reshape
@@ -41,7 +41,7 @@ def _get_fault_blocks(geo_model: gp.data.GeoModel) -> np.ndarray:
 
 def _get_lith_blocks(geo_model: gp.data.GeoModel) -> np.ndarray:
     lith_blocks = geo_model.solutions.raw_arrays.block_matrix[[not x for x in geo_model.structural_frame.group_is_fault]]
-    resolution = geo_model.solutions.octrees_output[-1].grid_centers.regular_grid.resolution
+    resolution = geo_model.solutions.octrees_output[-1].grid_centers.octree_grid.resolution
 
     int__sum_axis__reshape = np.round(lith_blocks).astype(int).sum(axis=0).reshape(*resolution)
     return int__sum_axis__reshape

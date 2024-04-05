@@ -41,7 +41,7 @@ class Domain:
             domain = np.unique(self.sol.lith_block)
         self.set_domain(
             domain=domain,
-            grid_values=transform.apply_inverse(model_solutions.octrees_output[-1].grid_centers.regular_grid.original_values)
+            grid_values=transform.apply_inverse(model_solutions.octrees_output[-1].grid_centers.octree_grid.original_values)
         )
 
         # set data, default is None
