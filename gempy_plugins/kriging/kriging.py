@@ -10,6 +10,7 @@ import warnings
 from typing import Optional, Sequence
 
 import gempy as gp
+from gempy_engine.core.data.engine_grid import EngineGrid
 
 from gempy_engine.core.data.raw_arrays_solution import RawArraysSolution
 
@@ -39,9 +40,12 @@ class Domain:
         # TODO: Maybe also allow to pass a gempy regular grid object
         if domain is None:
             domain = np.unique(self.sol.lith_block)
+
+        # ! This works for now only on the dense grid.
+        centers: EngineGrid = model_solutions.octrees_output[0].grid_centers
         self.set_domain(
             domain=domain,
-            grid_values=transform.apply_inverse(model_solutions.octrees_output[-1].grid_centers.octree_grid.original_values)
+            grid_values=transform.apply_inverse(centers.dense_grid.values)
         )
 
         # set data, default is None
