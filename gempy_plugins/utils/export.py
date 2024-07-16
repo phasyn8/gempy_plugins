@@ -63,7 +63,7 @@ def export_geomap2geotiff(path, geo_model, geo_map=None, geotiff_filepath=None):
 
     print("Successfully exported geological map to  " +path)
 
-def export_moose_input(geo_model, path=None, filename='geo_model_units_moose_input.i'):
+def export_moose_input(geo_data, path=None, filename='geo_model_units_moose_input.i'):
     """
     Method to export a 3D geological model as MOOSE compatible input. 
 
@@ -75,11 +75,11 @@ def export_moose_input(geo_model, path=None, filename='geo_model_units_moose_inp
         
     """
     # get model dimensions
-    nx, ny, nz = geo_model.grid.regular_grid.resolution
-    xmin, xmax, ymin, ymax, zmin, zmax = geo_model.solutions.grid.regular_grid.extent
+    nx, ny, nz = geo_data.grid.regular_grid.resolution
+    xmin, xmax, ymin, ymax, zmin, zmax = geo_data.grid.regular_grid.extent
     
     # get unit IDs and restructure them
-    ids = np.round(geo_model.solutions.lith_block)
+    ids = np.round(geo_data.solutions._raw_arrays.lith_block)
     ids = ids.astype(int)
     
     liths = ids.reshape((nx, ny, nz))
@@ -89,14 +89,14 @@ def export_moose_input(geo_model, path=None, filename='geo_model_units_moose_inp
     idstring = '\n  '.join(map(str, liths))
 
     # create a dictionary with unit names and corresponding unit IDs
-    sids = dict(zip(geo_model._surfaces.df['surface'], geo_model._surfaces.df['id']))
+    sids = dict(zip(geo_data.structural_frame.elements_names, geo_data.structural_frame.elements_ids))
     surfs = list(sids.keys())
     uids = list(sids.values())
     # create strings for fstring, so in MOOSE, units have a name instead of an ID
     surfs_string = ' '.join(surfs)
     ids_string = ' '.join(map(str, uids))
     
-    fstring = f"""[MeshGenerators]
+    fstring = f"""[Mesh]
   [./gmg]
   type = GeneratedMeshGenerator
   dim = 3
@@ -105,7 +105,7 @@ def export_moose_input(geo_model, path=None, filename='geo_model_units_moose_inp
   nz = {nz}
   xmin = {xmin}
   xmax = {xmax}
-  yim = {ymin}
+  ymin = {ymin}
   ymax = {ymax}
   zmin = {zmin}
   zmax = {zmax}
